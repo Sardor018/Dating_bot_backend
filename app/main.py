@@ -190,11 +190,6 @@ async def start(message: types.Message):
         await message.answer('Произошла ошибка. Попробуйте позже.')
         print(f"Ошибка в /start: {type(e).__name__} - {str(e)}")
 
-# Эндпоинт для проверки состояния (поддержка GET и HEAD)
-@app.api_route("/health", methods=["GET", "HEAD"])
-async def health_check():
-    return {"status": "ok"}
-
 # Эндпоинт для вебхука
 @app.post("/webhook")
 async def webhook(request: Request):
