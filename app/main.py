@@ -177,13 +177,15 @@ dp = Dispatcher()
 # Обработчик команды /start
 @dp.message(F.text == "/start")
 async def start(message: types.Message):
-    chat_id = message.chat.id
-    await message.answer(f"Привет! Твой chat_id: {chat_id}")
     try:
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[
-            types.InlineKeyboardButton(text="Войти", web_app=WebAppInfo(url=f"{WEB_APP_URL}?chat_id={chat_id}"))
+            types.InlineKeyboardButton(
+                text="Войти",
+                web_app=WebAppInfo(url=WEB_APP_URL)  # Без параметров
+            )
         ]])
         await message.answer('Нажми кнопку, чтобы войти в приложение:', reply_markup=keyboard)
+        print(f"Сообщение отправлено в чат {message.chat.id}")
     except Exception as e:
         await message.answer('Произошла ошибка. Попробуйте позже.')
         print(f"Ошибка в /start: {type(e).__name__} - {str(e)}")
