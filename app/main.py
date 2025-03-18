@@ -177,37 +177,43 @@ dp = Dispatcher()
 # Обработчик команды /start
 @dp.message(F.text == "/start")
 async def start(message: types.Message):
+    chat_id = message.chat.id
+    await message.answer(f"Привет! Твой chat_id: {chat_id}")
     try:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="Войти", web_app=WebAppInfo(url=f"{WEB_APP_URL}?chat_id={chat_id}"))
+        keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[
+            types.InlineKeyboardButton(text="Войти", web_app=WebAppInfo(url=f"{WEB_APP_URL}?chat_id={chat_id}"))
         ]])
         await message.answer('Нажми кнопку, чтобы войти в приложение:', reply_markup=keyboard)
     except Exception as e:
         await message.answer('Произошла ошибка. Попробуйте позже.')
-        print(f"Ошибка: {e}")
+        print(f"Ошибка в /start: {type(e).__name__} - {str(e)}")
 
-# Запуск бота в фоновом режиме
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+    
+# Эндпоинт для вебхука
 @app.post("/webhook")
 async def webhook(request: Request):
-    update = Update(**await request.json())
-    await dp.process_update(update)
+    data = await request.json()
+    update = types.Update(**data)
+    # Ручная обработка обновления
+    await dp.feed_update(bot=bot, update=update)
     return {"status": "ok"}
 
+# Установка вебхука при запуске
 @app.on_event("startup")
 async def on_startup():
     webhook_url = "https://dating-bot-backend.onrender.com/webhook"
     await bot.set_webhook(webhook_url)
     print(f"Webhook установлен: {webhook_url}")
 
+# Отключение вебхука при завершении
 @app.on_event("shutdown")
 async def on_shutdown():
     await bot.delete_webhook()
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-# Закрытие сессии бота при остановке
+# Закрытие сессии бота
 async def bot_session_close():
     await bot.session.close()
 
