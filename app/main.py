@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 import asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Update
 from aiogram import F
 import base64
 from datetime import datetime
@@ -177,8 +177,6 @@ dp = Dispatcher()
 # Обработчик команды /start
 @dp.message(F.text == "/start")
 async def start(message: types.Message):
-    chat_id = message.chat.id
-    await message.answer(f"Привет! Твой chat_id: {chat_id}")
     try:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="Войти", web_app=WebAppInfo(url=f"{WEB_APP_URL}?chat_id={chat_id}"))
@@ -189,13 +187,25 @@ async def start(message: types.Message):
         print(f"Ошибка: {e}")
 
 # Запуск бота в фоновом режиме
-async def start_bot():
-    await bot.delete_webhook()
-    await dp.start_polling(bot)
+@app.post("/webhook")
+async def webhook(request: Request):
+    update = Update(**await request.json())
+    await dp.process_update(update)
+    return {"status": "ok"}
 
 @app.on_event("startup")
 async def on_startup():
-    asyncio.create_task(start_bot())
+    webhook_url = "https://dating-bot-backend.onrender.com/webhook"
+    await bot.set_webhook(webhook_url)
+    print(f"Webhook установлен: {webhook_url}")
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.delete_webhook()
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 # Закрытие сессии бота при остановке
 async def bot_session_close():
@@ -209,6 +219,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Сервер остановлен")
     except Exception as e:
-        print(f"Ошибка запуска: {e}")
+        print(f"Ошибка запуска: {type(e).__name__} - {str(e)}")
     finally:
         asyncio.run(bot_session_close())
