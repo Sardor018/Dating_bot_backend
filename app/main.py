@@ -20,7 +20,7 @@ from app.database import SessionLocal, User
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEB_APP_URL = "https://dating-bot-omega.vercel.app"  # URL фронтенда
+WEB_APP_URL = os.getenv("WEB_APP_URL")  # URL фронтенда
 
 # Инициализация FastAPI
 app = FastAPI()
