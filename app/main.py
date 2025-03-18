@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, validator
-from typing import Optional
+from typing import Optional, List
 import os
 from dotenv import load_dotenv
 import asyncio
@@ -48,6 +48,7 @@ class ProfileData(BaseModel):
     city: str
     birth_date: str
     gender: str
+    min_age_partner: Optional[int] = 18  # Добавлено поле для минимального возраста партнёра
 
     @validator('birth_date')
     def validate_birth_date(cls, v):
@@ -103,17 +104,21 @@ async def update_profile(
     city: str = Form(...),
     birth_date: str = Form(...),
     gender: str = Form(...),
-    photo: UploadFile = File(...),
+    min_age_partner: Optional[int] = Form(18),
+    photos: List[UploadFile] = File(...),  # Принимаем несколько файлов
     db: Session = Depends(get_db)
 ):
-    if not photo.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Only images are allowed")
+    # Проверка формата файлов
+    for photo in photos:
+        if not photo.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Only images are allowed")
 
     user = db.query(User).filter_by(chat_id=int(chat_id)).first()
     if not user:
         user = User(chat_id=int(chat_id))
         db.add(user)
 
+    # Обновление текстовых данных
     user.name = name
     user.instagram = instagram
     user.bio = bio
@@ -121,13 +126,18 @@ async def update_profile(
     user.city = city
     user.birth_date = birth_date
     user.gender = gender
+    user.min_age_partner = min_age_partner  # Добавлено новое поле
+
+    # Сохранение всех фотографий
     user.photos = user.photos or []
-    user.photos.append(await photo.read())
+    for photo in photos:
+        user.photos.append(await photo.read())
+
     user.is_profile_complete = True
 
     try:
         db.commit()
-        return {"message": "Profile updated successfully"}
+        return {"message": "Profile and photos updated successfully"}
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -147,7 +157,7 @@ async def get_candidates(chat_id: int, db: Session = Depends(get_db)):
         "chat_id": c.chat_id,
         "name": c.name,
         "bio": c.bio,
-        "photo": base64.b64encode(c.photos[0]).decode('utf-8') if c.photos else None
+        "photo": base64.b64encode(c.photos[0]).decode('utf-8') if c.photos and c.photos[0] else None
     } for c in candidates]
 
 @app.get("/profile/{chat_id}")
@@ -166,6 +176,7 @@ async def get_profile(chat_id: str, db: Session = Depends(get_db)):
         "city": user.city,
         "birth_date": user.birth_date,
         "gender": user.gender,
+        "min_age_partner": user.min_age_partner,
         "photos": photos_base64,
         "is_profile_complete": user.is_profile_complete
     }
