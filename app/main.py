@@ -176,7 +176,7 @@ async def get_profile(chat_id: str, db: Session = Depends(get_db)):
         "city": user.city,
         "birth_date": user.birth_date,
         "gender": user.gender,
-        "min_age_partner": user.min_age_partner,
+        "min_age_partner": user.min_age_partner if user.min_age_partner is not None else 18,  # Значение по умолчанию
         "photos": photos_base64,
         "is_profile_complete": user.is_profile_complete
     }
