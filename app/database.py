@@ -25,7 +25,6 @@ class User(Base):
     photos = Column(ARRAY(LargeBinary), nullable=True)  # Массив фотографий
     is_profile_complete = Column(Boolean, default=False)
     liked = Column(ARRAY(BigInteger), default=[])  # Массив ID вместо строки
-    min_age_partner = Column(Integer, default=18, nullable=True)  # Новое поле
 
     __table_args__ = {'extend_existing': True}
 
