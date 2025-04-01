@@ -75,6 +75,7 @@ class Message(Base):
     text = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
 
-    owner = relationship("User", back_populates="messages")
+    sender = relationship("User", foreign_keys=[from_user], backref="sent_messages")
+    recipient = relationship("User", foreign_keys=[to_user], backref="received_messages")
 # Создание таблиц
 Base.metadata.create_all(engine)
