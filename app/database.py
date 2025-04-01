@@ -16,10 +16,10 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(BigInteger, unique=True, index=True, nullable=False)  # Обязательное поле
+    chat_id = Column(BigInteger, unique=True, index=True, nullable=False)
     selected_language = Column(String, nullable=True)
     name = Column(String, nullable=True)
-    instagram = Column(String, nullable=True)  # Поле необязательное
+    instagram = Column(String, nullable=True)
     about = Column(String, nullable=True)
     country = Column(String, nullable=True)
     city = Column(String, nullable=True)
@@ -37,7 +37,7 @@ class Photo(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_chat_id = Column(BigInteger, ForeignKey("users.chat_id"), nullable=False)
-    file_path = Column(String, nullable=False)  # Храним путь к файлу как строку
+    file_path = Column(String, nullable=False)
 
     owner = relationship("User", back_populates="photos")
 

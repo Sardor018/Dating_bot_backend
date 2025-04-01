@@ -52,7 +52,18 @@ async def check_user(chat_id: int, db: Session = Depends(get_db)):
 async def set_language(chat_id: int = Form(...), selected_language: str = Form(...), db: Session = Depends(get_db)):
     user = db.query(User).filter_by(chat_id=chat_id).first()
     if not user:
-        user = User(chat_id=chat_id, selected_language=selected_language)
+        # Set defaults for optional fields to avoid NOT NULL violations
+        user = User(
+            chat_id=chat_id,
+            selected_language=selected_language,
+            instagram="",  # Default to empty string if NOT NULL constraint exists
+            name=None,
+            about=None,
+            country=None,
+            city=None,
+            birthday=None,
+            gender=None
+        )
         db.add(user)
     else:
         user.selected_language = selected_language
