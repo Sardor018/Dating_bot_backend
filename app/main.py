@@ -14,10 +14,7 @@ from aiogram import F
 from datetime import datetime
 from fastapi.responses import JSONResponse
 from app.database import SessionLocal, User, engine
-from app import database
-
-# Импортируем наши модели, схемы и настройки базы данных
-import schemas
+from app import database, schemas
 
 
 # Загрузка переменных окружения из .env в корне backend
