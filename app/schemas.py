@@ -20,7 +20,7 @@ class UserResponse(UserCreate):
     is_verified: bool
 
     class Config:
-        orm_mode = True  # Позволяет работать с объектами SQLAlchemy
+        from_attributes = True  # Позволяет работать с объектами SQLAlchemy
 
 # Схема для загрузки фотографий
 class PhotoUpload(BaseModel):
