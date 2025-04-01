@@ -2,6 +2,7 @@ import os
 import asyncio
 import base64
 import shutil
+import logging
 from fastapi import FastAPI, Depends, File, UploadFile, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -15,7 +16,8 @@ from datetime import datetime
 from fastapi.responses import JSONResponse
 from app.database import SessionLocal, User, engine
 from app import database, schemas
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Загрузка переменных окружения из .env в корне backend
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
@@ -50,10 +52,13 @@ def get_db():
 # Эндпоинты FastAPI
 @app.get("/check_user")
 async def check_user(chat_id: int, db: Session = Depends(get_db)):
+    logger.info(f"Запрос для chat_id: {chat_id}")
     try:
         user = db.query(User).filter_by(chat_id=chat_id).first()
-        return {"is_verified": user.is_verified if user else False}
-    except SQLAlchemyError as e:
+        logger.info(f"Результат запроса: {user}")
+        return {"is_profile_complete": user.is_profile_complete if user else False}
+    except Exception as e:
+        logger.error(f"Ошибка: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/like")
