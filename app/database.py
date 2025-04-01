@@ -2,14 +2,14 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, LargeBinary, BigInteger, Date, DateTime, ForeignKey
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 from sqlalchemy.dialects.postgresql import ARRAY  # Для PostgreSQL
 from dotenv import load_dotenv
 load_dotenv()
 # Конфигурация из переменных окружения
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL, echo=False)  # echo=True для дебаггинга
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 
 # Модель пользователя

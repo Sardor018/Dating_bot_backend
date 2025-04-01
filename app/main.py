@@ -16,6 +16,7 @@ from datetime import datetime
 from fastapi.responses import JSONResponse
 from app.database import SessionLocal, User, engine
 from app import database, schemas
+from sqlalchemy.exc import OperationalError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,13 @@ database.Base.metadata.create_all(bind=engine)
 
 # Зависимость для получения сессии БД в каждом запросе
 def get_db():
-    db = SessionLocal()  # Открываем новую сессию
+    db = SessionLocal()
     try:
-        yield db  # Возвращаем сессию для использования в эндпоинте
+        yield db
+    except OperationalError:
+        db.rollback()  # Откатываем транзакцию при ошибке
     finally:
-        db.close()  # Закрываем сессию после обработки запроса
+        db.close()
 
 # Эндпоинт для сохранения выбранного языка (создание/обновление пользователя)
 # Эндпоинты FastAPI
