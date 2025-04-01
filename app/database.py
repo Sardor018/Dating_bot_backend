@@ -17,8 +17,8 @@ class User(Base):
     __tablename__ = "users"  # Имя таблицы в базе данных
 
     id = Column(Integer, primary_key=True, index=True)  # Первичный ключ
-    chat_id = Column(BigInteger, primary_key=True, index=True)
-    selected_language = Column(String, nullable=True)  # Выбранный язык
+    chat_id = Column(BigInteger, unique=True, index=True)  # Уникальный chat_id
+    selected_language = Column(String, nullable=True) # Выбранный язык
     name = Column(String, nullable=True)  # Имя пользователя
     instagram = Column(String, nullable=False)  # Instagram аккаунт (необязательный)
     about = Column(String, nullable=True)  # О себе
@@ -36,14 +36,13 @@ class User(Base):
 
 # Модель фотографий
 class Photo(Base):
-    __tablename__ = "photos"  # Имя таблицы для фотографий
+    __tablename__ = "photos"
 
-    id = Column(Integer, primary_key=True, index=True)  # Первичный ключ
-    user_id = Column(Integer, ForeignKey("users.id"))  # Внешний ключ к таблице пользователей
-    file_path = Column(ARRAY(LargeBinary), nullable=True)  # Массив фотографий
+    id = Column(Integer, primary_key=True, index=True)
+    user_chat_id = Column(BigInteger, ForeignKey("users.chat_id"))  # Используйте chat_id как внешний ключ
+    file_path = Column(ARRAY(LargeBinary), nullable=True)
 
-    # Связываем фотографию с пользователем
-    owner = relationship("User", back_populates="photos")
+    owner = relationship("User", back_populates="photos", foreign_keys=[user_chat_id])
 
 # Модель селфи (верификация)
 class Selfie(Base):
