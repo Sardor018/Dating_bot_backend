@@ -14,6 +14,7 @@ from aiogram import F
 from fastapi.responses import JSONResponse
 from app.database import SessionLocal, User, engine
 from app import schemas
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,13 +22,14 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEB_APP_URL = os.getenv("WEB_APP_URL")
+WEB_APP_URL = os.getenv("WEB_APP_URL")  # Ensure this is "https://dating-bot-omega.vercel.app"
 
 app = FastAPI()
 
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[WEB_APP_URL],
+    allow_origins=[WEB_APP_URL],  # Or ["https://dating-bot-omega.vercel.app"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,11 +54,10 @@ async def check_user(chat_id: int, db: Session = Depends(get_db)):
 async def set_language(chat_id: int = Form(...), selected_language: str = Form(...), db: Session = Depends(get_db)):
     user = db.query(User).filter_by(chat_id=chat_id).first()
     if not user:
-        # Set defaults for optional fields to avoid NOT NULL violations
         user = User(
             chat_id=chat_id,
             selected_language=selected_language,
-            instagram="",  # Default to empty string if NOT NULL constraint exists
+            instagram="",
             name=None,
             about=None,
             country=None,
