@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, LargeBinary, BigInteger, Date, DateTime, ForeignKey
+from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.dialects.postgresql import ARRAY  # Для PostgreSQL

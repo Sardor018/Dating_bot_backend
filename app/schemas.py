@@ -37,3 +37,7 @@ class SelfieUpload(BaseModel):
 class AgreementCreate(BaseModel):
     user_id: int
     accepted: bool
+
+class LikeRequest(BaseModel):
+    chat_id: int
+    target_chat_id: int
