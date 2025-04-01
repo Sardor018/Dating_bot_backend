@@ -52,7 +52,7 @@ def get_db():
 async def check_user(chat_id: int, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter_by(chat_id=chat_id).first()
-        return {"is_profile_complete": user.is_profile_complete if user else False}
+        return {"is_verified": user.is_verified if user else False}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,11 +76,11 @@ async def like_user(request: schemas.LikeRequest, db: Session = Depends(get_db))
 @app.get("/candidates")
 async def get_candidates(chat_id: int, db: Session = Depends(get_db)):
     current_user = db.query(User).filter_by(chat_id=chat_id).first()
-    if not current_user or not current_user.is_profile_complete:
+    if not current_user or not current_user.is_verified:
         raise HTTPException(status_code=400, detail="Profile not completed")
     
     candidates = db.query(User).filter(
-        User.is_profile_complete == True,
+        User.is_verified == True,
         User.chat_id != chat_id,
         ~User.chat_id.in_(current_user.liked if current_user.liked else [])
     ).all()
@@ -109,7 +109,7 @@ async def get_profile(chat_id: str, db: Session = Depends(get_db)):
         "gender": user.gender,
         "min_age_partner": user.min_age_partner if user.min_age_partner is not None else 18,  # Значение по умолчанию
         "photos": photos_base64,
-        "is_profile_complete": user.is_profile_complete
+        "is_verified": user.is_verified
     }
 
 @app.post("/api/user/language", response_model=schemas.UserResponse)
