@@ -1,20 +1,24 @@
+import os
+import asyncio
+import base64
+import shutil
 from fastapi import FastAPI, Depends, File, UploadFile, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import BaseModel, validator
 from typing import Optional, List
-import os
 from dotenv import load_dotenv
-import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Update
 from aiogram import F
-import base64
 from datetime import datetime
+from fastapi.responses import JSONResponse
+from app.database import SessionLocal, User, engine
+from app import database
 
-# Предполагается, что база данных настроена в app.database
-from app.database import SessionLocal, User
+# Импортируем наши модели, схемы и настройки базы данных
+import schemas
+
 
 # Загрузка переменных окружения из .env в корне backend
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
@@ -34,40 +38,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pydantic-модели
-class LikeRequest(BaseModel):
-    chat_id: int
-    target_chat_id: int
+# Создаем таблицы в базе данных (если они еще не созданы)
+database.Base.metadata.create_all(bind=engine)
 
-class ProfileData(BaseModel):
-    chat_id: int
-    name: str
-    instagram: Optional[str] = None
-    bio: str
-    country: str
-    city: str
-    birth_date: str
-    gender: str
-    min_age_partner: Optional[int] = 18  # Добавлено поле для минимального возраста партнёра
-
-    @validator('birth_date')
-    def validate_birth_date(cls, v):
-        try:
-            birth = datetime.strptime(v, '%Y-%m-%d')
-            if (datetime.now().year - birth.year) < 18:
-                raise ValueError("Minimum age is 18")
-            return v
-        except ValueError:
-            raise ValueError("Invalid date format or age")
-
-# Зависимость для базы данных
+# Зависимость для получения сессии БД в каждом запросе
 def get_db():
-    db = SessionLocal()
+    db = SessionLocal()  # Открываем новую сессию
     try:
-        yield db
+        yield db  # Возвращаем сессию для использования в эндпоинте
     finally:
-        db.close()
+        db.close()  # Закрываем сессию после обработки запроса
 
+# Эндпоинт для сохранения выбранного языка (создание/обновление пользователя)
 # Эндпоинты FastAPI
 @app.get("/check_user")
 async def check_user(chat_id: int, db: Session = Depends(get_db)):
@@ -78,7 +60,7 @@ async def check_user(chat_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/like")
-async def like_user(request: LikeRequest, db: Session = Depends(get_db)):
+async def like_user(request: schemas.LikeRequest, db: Session = Depends(get_db)):
     current_user = db.query(User).filter_by(chat_id=request.chat_id).first()
     target_user = db.query(User).filter_by(chat_id=request.target_chat_id).first()
 
@@ -93,54 +75,6 @@ async def like_user(request: LikeRequest, db: Session = Depends(get_db)):
 
     match = request.chat_id in (target_user.liked or [])
     return {"match": match}
-
-@app.post("/profile")
-async def update_profile(
-    chat_id: str = Form(...),
-    name: str = Form(...),
-    instagram: Optional[str] = Form(None),
-    bio: str = Form(...),
-    country: str = Form(...),
-    city: str = Form(...),
-    birth_date: str = Form(...),
-    gender: str = Form(...),
-    min_age_partner: Optional[int] = Form(18),
-    photos: List[UploadFile] = File(...),  # Принимаем несколько файлов
-    db: Session = Depends(get_db)
-):
-    # Проверка формата файлов
-    for photo in photos:
-        if not photo.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Only images are allowed")
-
-    user = db.query(User).filter_by(chat_id=int(chat_id)).first()
-    if not user:
-        user = User(chat_id=int(chat_id))
-        db.add(user)
-
-    # Обновление текстовых данных
-    user.name = name
-    user.instagram = instagram
-    user.bio = bio
-    user.country = country
-    user.city = city
-    user.birth_date = birth_date
-    user.gender = gender
-    user.min_age_partner = min_age_partner  # Добавлено новое поле
-
-    # Сохранение всех фотографий
-    user.photos = user.photos or []
-    for photo in photos:
-        user.photos.append(await photo.read())
-
-    user.is_profile_complete = True
-
-    try:
-        db.commit()
-        return {"message": "Profile and photos updated successfully"}
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/candidates")
 async def get_candidates(chat_id: int, db: Session = Depends(get_db)):
@@ -180,6 +114,127 @@ async def get_profile(chat_id: str, db: Session = Depends(get_db)):
         "photos": photos_base64,
         "is_profile_complete": user.is_profile_complete
     }
+
+@app.post("/api/user/language", response_model=schemas.UserResponse)
+def set_language(selected_language: str = Form(...), db: Session = Depends(get_db)):
+    """
+    Принимает выбранный язык и создает нового пользователя.
+    """
+    user = database.User(selected_language=selected_language)
+    db.add(user)
+    db.commit()
+    db.refresh(user)  # Обновляем объект пользователя, чтобы получить его id
+    return user  # Возвращаем данные пользователя
+
+# Эндпоинт для сохранения личных данных пользователя
+@app.post("/api/user/profile", response_model=schemas.UserResponse)
+def update_profile(
+    user_id: int = Form(...),
+    name: str = Form(...),
+    instagram: str = Form(""),
+    about: str = Form(""),
+    country: str = Form(""),
+    city: str = Form(""),
+    birthday: str = Form(...),  # Принимаем дату в виде строки
+    gender: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Обновляет данные профиля пользователя.
+    """
+    # Получаем пользователя по идентификатору
+    user = db.query(database.User).filter(database.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    # Обновляем поля профиля
+    user.name = name
+    user.instagram = instagram
+    user.about = about
+    user.country = country
+    user.city = city
+    try:
+        # Преобразуем строку в дату
+        user.birthday = datetime.strptime(birthday, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный формат даты")
+    user.gender = gender
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+# Эндпоинт для загрузки фотографий и соглашения
+@app.post("/api/user/photos")
+def upload_photos_and_agreement(
+    user_id: int = Form(...),
+    accepted: bool = Form(...),
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Загружает до 3 фотографий и сохраняет согласие с юридическим соглашением.
+    """
+    # Проверяем лимит фотографий
+    if len(files) > 3:
+        raise HTTPException(status_code=400, detail="Можно загрузить не более 3 фотографий")
+
+    # Сохраняем каждое фото на диск и создаем запись в БД
+    photo_paths = []
+    for file in files:
+        file_location = f"uploads/photos/{user_id}_{file.filename}"
+        # Создаем директорию, если не существует
+        os.makedirs(os.path.dirname(file_location), exist_ok=True)
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)  # Записываем файл на диск
+        photo_paths.append(file_location)
+        # Создаем запись для каждого фото
+        photo = database.Photo(user_id=user_id, file_path=file_location)
+        db.add(photo)
+
+    # Создаем запись о принятии соглашения
+    agreement = database.Agreement(user_id=user_id, accepted=accepted)
+    db.add(agreement)
+    db.commit()
+    return JSONResponse(content={"detail": "Фотографии и соглашение сохранены"})
+
+# Эндпоинт для загрузки селфи для верификации пользователя
+@app.post("/api/user/selfie")
+def upload_selfie(
+    user_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Принимает селфи, сохраняет его и отмечает пользователя как верифицированного.
+    """
+    file_location = f"uploads/selfies/{user_id}_{file.filename}"
+    os.makedirs(os.path.dirname(file_location), exist_ok=True)
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)  # Сохраняем файл селфи на диск
+
+    # Создаем запись селфи в БД
+    selfie = database.Selfie(user_id=user_id, file_path=file_location)
+    db.add(selfie)
+
+    # Обновляем статус пользователя на верифицированного
+    user = db.query(database.User).filter(database.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.is_verified = True
+
+    db.commit()
+    return JSONResponse(content={"detail": "Селфи сохранено, аккаунт подтвержден"})
+
+# Эндпоинт для получения данных пользователя (например, для редактирования профиля)
+@app.get("/api/user/profile/{user_id}", response_model=schemas.UserResponse)
+def get_profile(user_id: int, db: Session = Depends(get_db)):
+    """
+    Возвращает данные пользователя по его идентификатору.
+    """
+    user = db.query(database.User).filter(database.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return user
 
 # Инициализация Aiogram
 bot = Bot(token=BOT_TOKEN)
@@ -225,6 +280,7 @@ async def on_shutdown():
 # Закрытие сессии бота
 async def bot_session_close():
     await bot.session.close()
+
 
 if __name__ == "__main__":
     import uvicorn
